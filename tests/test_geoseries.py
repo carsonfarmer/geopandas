@@ -194,3 +194,14 @@ class TestSeries(unittest.TestCase):
         na = self.na_none.fillna()
         self.assertTrue(isinstance(na[2], BaseGeometry))
         self.assertTrue(na[2].is_empty)
+        
+    def test_prepare_geometries(self):
+        polys = self.landmarks.buffer(0.08)
+        preps = polys.prepare_geometries()
+        hits = preps.apply(lambda x: len(filter(x.contains, self.landmarks)))
+        assert_array_equal(hits, [1, 1])
+        
+    def test_bbox(self):
+        bbox = self.sol.x, self.sol.y, self.esb.x, self.esb.y
+        self.assertEqual(self.landmarks.bbox, bbox)
+                         

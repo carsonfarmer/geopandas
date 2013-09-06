@@ -308,6 +308,22 @@ class GeoSeries(Series):
         return DataFrame(bounds,
                          columns=['minx', 'miny', 'maxx', 'maxy'],
                          index=self.index)
+    
+    @property      
+    def bbox(self):
+        """Return a single bounding box (minx, miny, maxx, maxy) for all geometries
+
+        This is a shortcut for the following:
+        >>> aggregator = dict(minx=np.nanmin, miny=np.nanmin,
+                              maxx=np.nanmax, maxy=np.nanmax)
+        >>> series.bounds.groupby(lambda x: 1).agg(aggregator)
+        
+        """
+        aggregator = dict(minx=np.nanmin, miny=np.nanmin,
+                          maxx=np.nanmax, maxy=np.nanmax)
+        bbox = self.bounds.groupby(lambda x: 1).agg(aggregator)
+        return tuple(bbox.values[0].tolist())
+
 
     def buffer(self, distance, resolution=16):
         return GeoSeries([geom.buffer(distance, resolution) for geom in self],
@@ -325,6 +341,27 @@ class GeoSeries(Series):
 
     def project(self, *args, **kwargs):
         raise NotImplementedError
+        
+    def prepare_geometries(self):
+        """Return Series of efficient geometries
+        
+        Process geometries into a state that supports more efficient
+        batches of operations (e.g., for point-in-polygon analysis).
+        See shapely documentation for more details.
+
+        Example 1 - Count points in polygons
+        ----------
+        >>> points = [...] # large list of points
+        >>> preps = series.prepare_geometries()
+        >>> hits = preps.apply(lambda x: len(filter(x.contains, points)))
+        
+        Example 2 - Find overlapping points
+        ----------
+        >>> hits = preps.apply(lambda x: np.where(map(x.contains, points))[0])
+        """
+        
+        from shapely.prepared import prep
+        return Series(self.apply(prep)) # Return regular Series
 
     #
     # Implement standard operators for GeoSeries
