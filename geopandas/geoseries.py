@@ -14,7 +14,7 @@ import fiona
 from fiona.crs import from_epsg
 
 from plotting import plot_series
-from common import RTree
+from common import RTree, RTreeError
 
 EMPTY_COLLECTION = GeometryCollection()
 EMPTY_POLYGON = Polygon()
@@ -95,7 +95,12 @@ class GeoSeries(Series):
         """Update (replace) internal spatial index"""
         index = RTree()
         for i, (idx, item) in enumerate(self.iteritems()):
-            index.insert(i, item.bounds, idx)
+            try:
+                index.insert(i, item.bounds, idx)
+            except AttributeError: # Non geometry object
+                pass 
+            except RTreeError: # Issue with input bounding box?
+                pass # If it doesn't play nice, we don't want it!
         self.rtree = index
         
     #
@@ -648,8 +653,8 @@ class GeoSeries(Series):
                 bounds = (bounds[0].start, bounds[0].stop,
                         bounds[1].start, bounds[1].stop)
                 return self.extract(bounds, update_rtree)
-            hits = self.bbox_query(bounds, udpate_rtree)
-            return GeoSeries(self[hits], index=self.index, crs=self.crs)
+            hits = self.bbox_query(bounds, update_rtree)
+            return self[list(hits)]
         raise TypeError("bounds must be a tuple of length 2 (slices) or 4 (coords)")
         
     def nearest(self, other, num_results=1, update_rtree=False):
@@ -676,6 +681,6 @@ class GeoSeries(Series):
             other = other*2
         if self.rtree.is_empty or update_rtree:
             self.update_rtree()
-        hits = index.nearest(other, num_results)
-        return GeoSeries(self[hits], index=self.index, crs=self.crs)
+        hits = self.rtree.nearest(other, num_results)
+        return self[list(hits)]
 

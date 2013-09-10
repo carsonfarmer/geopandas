@@ -246,3 +246,29 @@ class TestSeries(unittest.TestCase):
         self.assertTrue(geom_almost_equals(self.g4, res.skew(ys=-skew, 
             origin=Point(0,0))))
 
+    def test_update_rtree(self):
+        self.landmarks.rtree = None
+        self.landmarks.update_rtree()
+        self.assertTrue(~self.landmarks.rtree.is_empty)
+
+    def test_bbox_query(self):
+        bbox = self.sol.buffer(self.sol.distance(self.esb)/2.).bounds
+        gen = self.landmarks.bbox_query(bbox)
+        self.assertEqual(len(list(gen)), 1)
+        bbox = self.esb.buffer(self.esb.distance(self.sol)).bounds
+        gen = self.landmarks.bbox_query(bbox)
+        self.assertEqual(len(list(gen)), 2)
+        
+    def test_extract(self):
+        bbox = self.sol.buffer(self.sol.distance(self.esb)/2.).bounds
+        res = self.landmarks.extract(bbox)
+        self.assertTrue(geom_equals(res, self.sol))
+        bbox = self.esb.buffer(self.esb.distance(self.sol)).bounds
+        res = self.landmarks.extract(bbox)
+        self.assertTrue(geom_equals(res, self.landmarks))
+        
+    def test_nearest(self):
+        # TODO: Better tests!
+        self.assertTrue(geom_equals(self.landmarks.nearest(self.sol), self.sol))
+        
+
