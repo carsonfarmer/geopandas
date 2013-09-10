@@ -14,6 +14,7 @@ import fiona
 from fiona.crs import from_epsg
 
 from plotting import plot_series
+from common import RTree
 
 EMPTY_COLLECTION = GeometryCollection()
 EMPTY_POLYGON = Polygon()
@@ -37,18 +38,23 @@ class GeoSeries(Series):
     """A Series object designed to store shapely geometry objects."""
 
     def __new__(cls, *args, **kwargs):
-        kwargs.pop('crs', None)
+        crs = kwargs.pop('crs', None)
         arr = Series.__new__(cls, *args, **kwargs)
         if type(arr) is GeoSeries:
-            return arr
+            subarr = arr
         else:
-            return arr.view(GeoSeries)
+            subarr = arr.view(GeoSeries)
+        subarr.rtree = RTree() # Empty rtree, update on initialization
+        return subarr
 
     def __init__(self, *args, **kwargs):
         crs = kwargs.pop('crs', None)
+        use_rtree = kwargs.pop('use_rtree', True)
         super(GeoSeries, self).__init__(*args, **kwargs)
         self.crs = crs
-
+        if use_rtree:
+            self.update_rtree()
+        
     @classmethod
     def from_file(cls, filename, **kwargs):
         """
@@ -84,6 +90,13 @@ class GeoSeries(Series):
                           index=self.index)
         data.crs = self.crs
         data.to_file(filename, driver, **kwargs)
+        
+    def update_rtree(self):
+        """Update (replace) internal spatial index"""
+        index = RTree()
+        for i, (idx, item) in enumerate(self.iteritems()):
+            index.insert(i, item.bounds, idx)
+        self.rtree = index
         
     #
     # Internal methods
@@ -589,3 +602,80 @@ class GeoSeries(Series):
         result.__class__ = GeoSeries
         result.crs = crs
         return result
+        
+    def bbox_query(self, bounds=None, update_rtree=False):
+        """Return a generator over geometries within a given bounding box
+        
+        This will use a spatial index even if the GeoSeries was 
+        created without one (i.e., user specified use_rtree=False)
+        
+        Parameters
+        ----------
+        bounds : tuple
+            Interleaved bounding box for query region (xmin, ymin, xmax, ymax).
+        update_rtree : boolean
+            Whether an empty or stale spatial index should be updated (replaced)
+        """
+        
+        if self.rtree.is_empty or update_rtree:
+            self.update_rtree()
+        if bounds is None:
+            bounds = self.rtree.bounds
+        # Use objects='raw' to return the actual index, not just the row number
+        return self.rtree.intersection(bounds, objects='raw')
+        
+    def extract(self, bounds, update_rtree=False):
+        """Subset GeoSeries to a given bounding box
+        
+        Similar to `bbox_query`, but `extract` returns a GeoSeries
+        
+        This will use a spatial index even if the GeoSeries was 
+        created without one (i.e., user specified use_rtree=False)
+        
+        Parameters
+        ----------
+        bounds : tuple or slice
+            If bounds is a tuple, it should be the bounding box of the query
+            region (xmin, ymin, xmax, ymax), if it is a slice, it should be a
+            two-dimentional slice of the form [xmin:xmax, ymin:ymax].
+        update_rtree : boolean
+            Whether an empty or stale spatial index should be updated (replaced)
+        """
+        if isinstance(bounds, tuple) and len(bounds) > 1 and len(bounds) < 5:
+            if all([isinstance(k, slice) and isinstance(k.start, float) and \
+                    isinstance(k.stop, float) for k in bounds]):
+                # Tuple of float slices useful for bounding box indexing
+                bounds = (bounds[0].start, bounds[0].stop,
+                        bounds[1].start, bounds[1].stop)
+                return self.extract(bounds, update_rtree)
+            hits = self.bbox_query(bounds, udpate_rtree)
+            return GeoSeries(self[hits], index=self.index, crs=self.crs)
+        raise TypeError("bounds must be a tuple of length 2 (slices) or 4 (coords)")
+        
+    def nearest(self, other, num_results=1, update_rtree=False):
+        """Return GeoSeries of the `num_results` nearest geometries to `other`
+        
+        Parameters
+        ----------
+        other : tuple or shapely geometry or GeoSeries
+            If other is a tuple, it should be a point coord (x, y) or 
+            bounding box (x0,y0,x1,y1), otherwise, the bounds of the input 
+            object are used.
+        num_results : integer
+            The number of nearest neighbors to return (default is 1)
+        update_rtree : boolean
+            Whether an empty or stale spatial index should be updated (replaced)
+        """
+        if isinstance(other, BaseGeometry):
+            other = other.bounds
+        elif isinstance(other, GeoSeries):
+            other = other.bbox
+        if len(other) != 2 and len(other) != 4:
+            raise TypeError("Please specify a single point or bounding box")
+        if len(other) == 2:
+            other = other*2
+        if self.rtree.is_empty or update_rtree:
+            self.update_rtree()
+        hits = index.nearest(other, num_results)
+        return GeoSeries(self[hits], index=self.index, crs=self.crs)
+
