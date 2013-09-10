@@ -436,6 +436,112 @@ class GeoSeries(Series):
 
     def plot(self, *args, **kwargs):
         return plot_series(self, *args, **kwargs)
+        
+    #
+    # Pandas univariate statistics
+    #
+        
+    def round(self, decimals=0):
+        """Return GeoSeries with coordinates rounded to given number of decimals.
+        
+        Parameters
+        ----------
+        decimals : int, optional
+            Number of decimal places to round to (default: 0).  If
+            decimals is negative, it specifies the number of positions to
+            the left of the decimal point.
+       
+        Returns
+        -------
+        rounded : GeoSeries
+            A GeoSeries of the same shape as input containing the rounded 
+            geometries.
+
+        This function is similar to `numpy.around`, which is performed on 
+        the individual coordinates. See `numpy.around` for full documentation.
+        """
+        
+        rounder = partial(np.around, decimals=decimals, out=None)
+        result = self.apply(lambda geom: transform(rounder, geom))
+        return GeoSeries(result, index=self.index, name=self.name, 
+                crs=self.crs)
+                
+    def sum(self, *args, **kwargs):
+        raise NotImplementedError("Consider using `GeoSeries.unary_union` to aggregate geometries.")
+    
+    def mean(self, *args, **kwargs):
+        raise NotImplementedError
+        
+    def median(self, *args, **kwargs):
+        raise NotImplementedError
+        
+    def prod(self, *args, **kwargs):
+        raise NotImplementedError
+        
+    def mad(self, skipna=True, level=None):
+        raise NotImplementedError    
+    
+    def min(self, axis=None, out=None, skipna=True, level=None):
+        raise NotImplementedError 
+    
+    def max(self, axis=None, out=None, skipna=True, level=None): 
+        raise NotImplementedError 
+    
+    def std(self, axis=None, dtype=None, out=None, ddof=1, skipna=True,
+            level=None):
+        raise NotImplementedError
+        
+    def var(self, axis=None, dtype=None, out=None, ddof=1, skipna=True,
+            level=None):
+        raise NotImplementedError
+        
+    def skew(self, skipna=True, level=None):
+        raise NotImplementedError
+        
+    def kurt(self, skipna=True, level=None):
+        raise NotImplementedError
+        
+    def idxmin(self, axis=None, out=None, skipna=True):
+        raise NotImplementedError
+        
+    def idxmax(self, axis=None, out=None, skipna=True):
+        raise NotImplementedError
+        
+    def cumsum(self, axis=0, dtype=None, out=None, skipna=True):
+        raise NotImplementedError("Consider using `GeoSeries.unary_union` to aggregate geometries.")
+        
+    def cumprod(self, axis=0, dtype=None, out=None, skipna=True):
+        raise NotImplementedError
+    
+    def cummax(self, axis=0, dtype=None, out=None, skipna=True):
+        raise NotImplementedError
+    
+    def cummin(self, axis=0, dtype=None, out=None, skipna=True):
+        raise NotImplementedError
+    
+    def quantile(self, q=0.5):
+        raise NotImplementedError
+    
+    def ptp(self, axis=None, out=None):
+        raise NotImplementedError
+    
+    def corr(self, other, method='pearson', min_periods=None):
+        raise NotImplementedError
+    
+    def cov(self, other, min_periods=None):
+        raise NotImplementedError
+    
+    def diff(self, periods=1):
+        raise NotImplementedError
+    
+    def autocorr(self):
+        raise NotImplementedError
+        
+    def dot(self, other):
+        raise NotImplementedError
+        
+    def asof(self, where):
+        raise NotImplementedError
 
     #
     # Additional methods
