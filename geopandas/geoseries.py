@@ -9,6 +9,7 @@ from shapely.geometry import shape, Polygon, Point
 from shapely.geometry.collection import GeometryCollection
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import cascaded_union, unary_union, transform
+from shapely.validation import explain_validity
 import fiona
 from fiona.crs import from_epsg
 
@@ -299,8 +300,19 @@ class GeoSeries(Series):
     #
     # Other operations
     #
+    
+    def explain_validity(self):
+        """
+        Returns a Series of strings explaining the validity or
+        invalidity of each geometry
 
-    # should this return bounds for entire series, or elementwise?
+        See shapely documentation for more details:
+        http://toblerity.org/shapely/manual.html#diagnostics
+        """
+        
+        return Series(self.apply(explain_validity))
+
+    # Should this return bounds for entire series, or elementwise?
     @property
     def bounds(self):
         """Return a DataFrame of minx, miny, maxx, maxy values of geometry objects"""
@@ -470,14 +482,61 @@ class GeoSeries(Series):
                                                    method=method,
                                                    limit=limit)
         return GeoSeries(left), GeoSeries(right)
+        
+    #
+    # Pandas clipping
+    #    
+        
+    # Basic `clip` is covered by `Series.clip`
+    
+    def clip_upper(self, threshold):
+        """Return copy of GeoSeries with geometries with areas > threshold removed.
+
+        Parameters
+        --------
+        threshold : float
+            Drop all geometries with area greater than `threshold`
+            
+        See also
+        --------
+        clip        
+
+        Returns
+        -------
+        clipped : GeoSeries
+        """
+
+        return self[self.area < threshold]
+
+    def clip_lower(self, threshold):
+        """Return copy of GeoSeries with geometries with areas < threshold removed.
+        
+        Parameters
+        --------
+        threshold : float
+            Drop all geometries with area less than `threshold`
+
+        See also
+        --------
+        clip
+
+        Returns
+        -------
+        clipped : GeoSeries
+        """
+
+        return self[areas.area > threshold]
 
     def plot(self, *args, **kwargs):
         return plot_series(self, *args, **kwargs)
-
+        
     #
     # Additional methods
     #
-
+    
+    def coords(self):
+        return Series(self.apply(lambda x: x.__geo_interface__['coordinates']))
+    
     def to_crs(self, crs=None, epsg=None):
         """Transform geometries to a new coordinate reference system
 
